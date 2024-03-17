@@ -1,44 +1,62 @@
-function [ Y ] = ADSR_env( Z, beat_length, num_beats, fs )
-    n = floor(fs*beat_length*num_beats);
-    E = zeros(n,1);
-
-    % modified strum pattern to match the song's rhythm
-    strums = [0, 1/6, 1/3, 1/2, 2/3, 5/6];
-
-    % updated ADSR lengths for a different envelope shape
-    ADSR = [0.05, 0.3, 0.5, 0.15]; % envelope should add up to 1
-
-    % new peak and sustain levels for different dynamics
-    peak = 0.8; % reduced peak for a softer attack
-    mid = 0.3;  % increased sustain for more emphasis
-
-    A = 0;
-    D = ADSR(1);
-    S = D + ADSR(2);
-    R = S + ADSR(3);
-
-    ind = 0;
-    for i = 1:length(strums)
-        if (i ~= length(strums))
-            k = floor(n*strums(i+1)) - ind;
-        else
-            k = n - ind;
+    function [ Y ] = ADSR_env( Z, beat_length, num_beats, fs )
+        n = floor(fs*beat_length*num_beats);
+        E = zeros(n,1);
+    
+        % modified strum pattern to match the song's rhythm
+        strums = [0, 1/6, 1/3, 1/2, 2/3, 5/6];
+    
+        % updated ADSR lengths for a different envelope shape
+        ADSR = [0.05, 0.3, 0.5, 0.15]; % envelope should add up to 1
+    
+        % new peak and sustain levels for different dynamics
+        peak = 0.8; % reduced peak for a softer attack
+        mid = 0.3;  % increased sustain for more emphasis
+    
+        A = 0;
+        D = ADSR(1);
+        S = D + ADSR(2);
+        R = S + ADSR(3);
+    
+        ind = 0;
+        for i = 1:length(strums)
+            if (i ~= length(strums))
+                k = floor(n*strums(i+1)) - ind;
+            else
+                k = n - ind;
+            end
+            d = floor(D*k);
+            s = floor(S*k);
+            r = floor(R*k);
+            F = zeros(1,k);
+            F(1:d) = linspace(0, peak, d);
+            F(d+1:s) = linspace(peak, mid, s-d);
+            F(s+1:r) = linspace(mid, mid, r-s);
+            F(r+1:k) = linspace(mid, 0, k-r);
+            E(ind+1:ind+k) = F;
+            ind = ind + k;
         end
-        d = floor(D*k);
-        s = floor(S*k);
-        r = floor(R*k);
-        F = zeros(1,k);
-        F(1:d) = linspace(0, peak, d);
-        F(d+1:s) = linspace(peak, mid, s-d);
-        F(s+1:r) = linspace(mid, mid, r-s);
-        F(r+1:k) = linspace(mid, 0, k-r);
-        E(ind+1:ind+k) = F;
-        ind = ind + k;
+    
+        E(ind+1:n) = E(ind);
+    
+        reps = length(Z)/n;
+        E_rep = repmat(E, 1, ceil(reps));
+        Y = E_rep(1:length(Z)).*Z;
+
+        window_size = 256; 
+        noverlap = []; 
+        nfft = []; 
+        
+        % calculate the spectrogram
+        [S, F, T, P] = spectrogram(Y, window_size, noverlap, nfft, fs);
+        
+        % display the spectrogram
+        spectrogram(Y, window_size, noverlap, nfft, fs, 'yaxis');
+        
+        colormap('jet'); 
+        colorbar; 
+        
+        % labels and title
+        xlabel('Time (s)');
+        ylabel('Frequency (Hz)');
+        title('Spectrogram of the Signal');
     end
-
-    E(ind+1:n) = E(ind);
-
-    reps = length(Z)/n;
-    E_rep = repmat(E, 1, ceil(reps));
-    Y = E_rep(1:length(Z)).*Z;
-end
